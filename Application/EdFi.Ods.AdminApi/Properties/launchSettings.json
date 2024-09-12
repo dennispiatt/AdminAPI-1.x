@@ -14,11 +14,11 @@
       "dotnetRunMessages": true,
       "launchBrowser": true,
       "launchUrl": "swagger",
-      "applicationUrl": "https://localhost:7214;http://localhost:5214",
+      "applicationUrl": "https://localhost:7215;http://localhost:5215",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "AUTHENTICATION__AUTHORITY": "https://localhost:7214",
-        "AUTHENTICATION__ISSUERURL": "https://localhost:7214"
+        "AUTHENTICATION__AUTHORITY": "https://localhost:7215",
+        "AUTHENTICATION__ISSUERURL": "https://localhost:7215"
       }
     },
     "EdFi.Ods.AdminApi (Prod)": {

@@ -55,7 +55,7 @@ namespace EdFi.Ods.AdminApi.Infrastructure.ClaimSetEditor
             var parentResources = dbParentResources.GroupBy(x => x.ResourceClaim).Select(x => new ResourceClaim
             {
                 Id = x.Key.ResourceClaimId,
-                Name = x.Key.ResourceName,
+                Name = x.Key.ClaimName,
                 Create = x.Any(a => a.Action.ActionName == Action.Create.Value),
                 Read = x.Any(a => a.Action.ActionName == Action.Read.Value),
                 Update = x.Any(a => a.Action.ActionName == Action.Update.Value),
@@ -258,27 +258,41 @@ namespace EdFi.Ods.AdminApi.Infrastructure.ClaimSetEditor
 
         internal IReadOnlyList<ResourceClaim> GetChildResources(int claimSetId)
         {
-            var dbChildResources =
-                _securityContext.ClaimSetResourceClaimActions
-                .Include(x => x.ResourceClaim)
-                .Include(x => x.Action)
-                .Include(x => x.AuthorizationStrategyOverrides)
-                .Where(x => x.ClaimSet.ClaimSetId == claimSetId
-                            && x.ResourceClaim.ParentResourceClaimId != null).ToList();
-            var defaultAuthStrategies = GetDefaultAuthStrategies(dbChildResources.Select(x => x.ResourceClaim).ToList());
-            var authStrategyOverrides = GetAuthStrategyOverrides(dbChildResources.ToList());
+            //var dbChildResources =
+            //    _securityContext.ClaimSetResourceClaimActions
+            //    .Include(x => x.ResourceClaim)
+            //    .Include(x => x.Action)
+            //    .Include(x => x.AuthorizationStrategyOverrides)
+            //    .Where(x => x.ClaimSet.ClaimSetId == claimSetId)
+            //    .ToList();
 
-            var childResources = dbChildResources.GroupBy(x => x.ResourceClaim)
+            var dbChildResources = _securityContext.ClaimSetResourceClaimActions
+                .Include(csrca => csrca.Action)
+                .Include(csrca => csrca.AuthorizationStrategyOverrides)
+                .Where(csrca => csrca.ClaimSetId == claimSetId)
+                .GroupJoin(_securityContext.ResourceClaims,
+                    csrca => csrca.ResourceClaimId,
+                    rc => rc.ParentResourceClaimId,
+                    (csrca, rc) => new { csrca, rc })
+                .SelectMany(x => x.rc,
+                    (x,y) => new { claimSetResourceClaimAction = x.csrca, childResourceClaim = y })
+                .ToList();
+
+
+            var defaultAuthStrategies = GetDefaultAuthStrategies(dbChildResources.Select(x => x.childResourceClaim).ToList());
+            var authStrategyOverrides = GetAuthStrategyOverrides(dbChildResources.Select(x => x.claimSetResourceClaimAction).ToList());
+
+            var childResources = dbChildResources.GroupBy(x => x.childResourceClaim)
                 .Select(x => new ResourceClaim
                 {
                     Id = x.Key.ResourceClaimId,
                     ParentId = x.Key.ParentResourceClaimId ?? 0,
-                    Name = x.Key.ResourceName,
-                    Create = x.Any(a => a.Action.ActionName == Action.Create.Value),
-                    Read = x.Any(a => a.Action.ActionName == Action.Read.Value),
-                    Update = x.Any(a => a.Action.ActionName == Action.Update.Value),
-                    Delete = x.Any(a => a.Action.ActionName == Action.Delete.Value),
-                    ReadChanges = x.Any(a => a.Action.ActionName == Action.ReadChanges.Value),
+                    Name = x.Key.ClaimName,
+                    Create = x.Any(a => a.claimSetResourceClaimAction.Action.ActionName == Action.Create.Value),
+                    Read = x.Any(a => a.claimSetResourceClaimAction.Action.ActionName == Action.Read.Value),
+                    Update = x.Any(a => a.claimSetResourceClaimAction.Action.ActionName == Action.Update.Value),
+                    Delete = x.Any(a => a.claimSetResourceClaimAction.Action.ActionName == Action.Delete.Value),
+                    ReadChanges = x.Any(a => a.claimSetResourceClaimAction.Action.ActionName == Action.ReadChanges.Value),
                     IsParent = false,
                     DefaultAuthStrategiesForCRUD = defaultAuthStrategies[x.Key.ResourceClaimId],
                     AuthStrategyOverridesForCRUD = authStrategyOverrides.Keys.Any(p => p == x.Key.ResourceClaimId) ? authStrategyOverrides[x.Key.ResourceClaimId] : Array.Empty<ClaimSetResourceClaimActionAuthStrategies>(),
